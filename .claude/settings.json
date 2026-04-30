@@ -1,0 +1,30 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash(git commit*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "flutter analyze --no-fatal-infos && flutter test --no-pub 2>&1",
+            "timeout": 120,
+            "statusMessage": "analyze + test を実行中..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash(git commit*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/scripts/audit-config.py",
+            "timeout": 30,
+            "statusMessage": "Claude 設定の自動監査中..."
+          }
+        ]
+      }
+    ]
+  }
+}

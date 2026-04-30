@@ -21,6 +21,11 @@ flutter analyze
 # Run tests
 flutter test
 flutter test test/widget_test.dart   # single test file
+flutter test test/game/              # game-specific tests
+flutter test test/models/            # model tests
+
+# Check for outdated packages
+flutter pub outdated
 ```
 
 ## Architecture
@@ -50,3 +55,53 @@ World coordinates run from `(-2, -7)` top-left to `(2, 8)` bottom-right. Gravity
 ### Game-over logic
 
 A 2-second grace timer (`_gameOverTimer`) accumulates whenever any non-pending fruit is above `gameOverLineY = -5.5` with near-zero velocity. If the timer reaches 2 s, the `GameOver` overlay is shown.
+
+## Testing
+
+Uses `flame_test` + `flutter_test`. Game tests use `testWithGame`:
+
+```dart
+import 'package:flame_test/flame_test.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:watermelongame/game/watermelon_game.dart';
+
+testWithGame<WatermelonGame>(
+  'description',
+  WatermelonGame.new,
+  (game) async {
+    // game is fully loaded when this callback runs
+    game.update(0.016); // advance one physics frame (≈60 fps)
+    expect(game.score, 0);
+  },
+);
+```
+
+Key rules:
+- Never add/remove bodies inside the physics step — use `game.update()` to advance frames first.
+- `game.score` is public; `game.restart()` resets all state.
+- Test files live in `test/game/` (game logic) and `test/models/` (enum/data).
+
+## Improvement backlog
+
+Pending improvements are tracked in `.claude/work/output/improvement_proposals.md`.
+Use the `feature-implementer` agent to implement them one at a time.
+
+## Workflow tips
+
+- After implementing a feature, run `/simplify` to catch redundant code.
+- For recurring tasks (e.g. backlog triage), use `/schedule` to set up a background agent.
+
+## Self-improvement loop
+
+Run `/improve-claude` to execute one cycle of Claude Code self-improvement:
+
+1. `claude-config-auditor` scans `.claude/` and `CLAUDE.md` for stale references, hook gaps, and missing configs.
+2. The top-priority candidate is picked from `.claude/work/output/claude_setup_backlog.md`.
+3. `claude-config-implementer` applies the change and validates it.
+4. The change is committed (gated by the existing `flutter analyze + test` PreToolUse hook).
+
+Backlog file: `.claude/work/output/claude_setup_backlog.md`
+ID prefixes: `CFG-*` (settings/hooks/permissions) | `AGT-*` (agents) | `DOC-*` (CLAUDE.md) | `CMD-*` (commands/skills)
+
+Game-code improvements are tracked separately in `.claude/work/output/improvement_proposals.md` and use `feature-implementer`.
+You can also add items to the backlog manually — just follow the format in the file.
