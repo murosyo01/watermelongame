@@ -1,14 +1,12 @@
 import 'dart:math';
 
-import 'package:flame/components.dart';
 import 'package:flame/events.dart';
-import 'package:flame/text.dart';
 import 'package:flame_forge2d/flame_forge2d.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../components/drop_indicator.dart';
 import '../components/fruit.dart';
 import '../components/game_over_line.dart';
-import '../components/next_fruit_preview.dart';
+import '../components/merge_particles.dart';
 import '../components/walls.dart';
 import '../models/fruit_level.dart';
 import '../systems/merge_contact_listener.dart';
@@ -34,18 +32,15 @@ class WatermelonGame extends Forge2DGame with TapCallbacks, DragCallbacks {
   bool _gameOver = false;
   int score = 0;
 
-  // #3: Set<Fruit> でフルーツを管理して whereType を排除
   final Set<Fruit> _fruits = {};
-
-  late TextComponent _scoreText;
-  late TextComponent _nextFruitText;
   late DropIndicator _dropIndicator;
-  late NextFruitPreview _nextFruitPreview;
+
+  final scoreNotifier = ValueNotifier<int>(0);
+  late final ValueNotifier<FruitLevel> nextLevelNotifier;
 
   final _rng = Random();
   final Vector2 _dragCanvasPos = Vector2.zero();
 
-  // #7: onLoad を _setupCamera / _setupWorld / _setupUI に分割
   @override
   Future<void> onLoad() async {
     await super.onLoad();
@@ -87,33 +82,7 @@ class WatermelonGame extends Forge2DGame with TapCallbacks, DragCallbacks {
   }
 
   void _setupUI() {
-    _scoreText = TextComponent(
-      text: 'Score: 0',
-      position: Vector2(4, 8),
-      textRenderer: TextPaint(
-        style: const TextStyle(color: Colors.white, fontSize: 16),
-      ),
-    );
-    camera.viewport.add(_scoreText);
-
-    _nextFruitText = TextComponent(
-      text: 'Next: ${_getFruitName(_nextLevel)}',
-      position: Vector2(4, 28),
-      textRenderer: TextPaint(
-        style: TextStyle(color: _nextLevel.color, fontSize: 14),
-      ),
-    );
-    camera.viewport.add(_nextFruitText);
-
-    _nextFruitPreview = NextFruitPreview(
-      level: _nextLevel,
-      center: Vector2(size.x - 40, 40),
-    );
-    camera.viewport.add(_nextFruitPreview);
-  }
-
-  String _getFruitName(FruitLevel level) {
-    return level.name[0].toUpperCase() + level.name.substring(1);
+    nextLevelNotifier = ValueNotifier(_nextLevel);
   }
 
   void _enqueueMerge(MergePair pair) {
@@ -131,14 +100,12 @@ class WatermelonGame extends Forge2DGame with TapCallbacks, DragCallbacks {
       containerLeft + _nextLevel.radius + 0.05,
       containerRight - _nextLevel.radius - 0.05,
     );
-    world.add(Fruit(level: _nextLevel, spawnPosition: Vector2(clampedX, dropLineY)));
+    final fruit = Fruit(level: _nextLevel, spawnPosition: Vector2(clampedX, dropLineY));
+    world.add(fruit);
+    _fruits.add(fruit);
     _dropIndicator.updateX(clampedX);
     _nextLevel = _randomLevel();
-    _nextFruitText.text = 'Next: ${_getFruitName(_nextLevel)}';
-    _nextFruitText.textRenderer = TextPaint(
-      style: TextStyle(color: _nextLevel.color, fontSize: 14),
-    );
-    _nextFruitPreview.updateLevel(_nextLevel);
+    nextLevelNotifier.value = _nextLevel;
     _dropCooldown = 0.5;
   }
 
@@ -170,13 +137,11 @@ class WatermelonGame extends Forge2DGame with TapCallbacks, DragCallbacks {
   void onDragEnd(DragEndEvent event) {
     super.onDragEnd(event);
     if (_gameOver || _dropCooldown > 0) return;
-    world.add(Fruit(level: _nextLevel, spawnPosition: Vector2(_dropIndicator.worldX, dropLineY)));
+    final fruit = Fruit(level: _nextLevel, spawnPosition: Vector2(_dropIndicator.worldX, dropLineY));
+    world.add(fruit);
+    _fruits.add(fruit);
     _nextLevel = _randomLevel();
-    _nextFruitText.text = 'Next: ${_getFruitName(_nextLevel)}';
-    _nextFruitText.textRenderer = TextPaint(
-      style: TextStyle(color: _nextLevel.color, fontSize: 14),
-    );
-    _nextFruitPreview.updateLevel(_nextLevel);
+    nextLevelNotifier.value = _nextLevel;
     _dropCooldown = 0.5;
   }
 
@@ -208,7 +173,6 @@ class WatermelonGame extends Forge2DGame with TapCallbacks, DragCallbacks {
 
       final nextLevel = pair.a.level.next;
 
-      // #3: Set から削除してから removeFromParent
       _fruits.remove(pair.a);
       _fruits.remove(pair.b);
       pair.a.removeFromParent();
@@ -217,22 +181,23 @@ class WatermelonGame extends Forge2DGame with TapCallbacks, DragCallbacks {
       if (nextLevel != null) {
         final newFruit = Fruit(level: nextLevel, spawnPosition: midPoint.clone());
         world.add(newFruit);
-        _fruits.add(newFruit); // #3
+        _fruits.add(newFruit);
+        world.add(MergeParticles(position: midPoint.clone(), color: pair.a.level.color));
         score += nextLevel.score;
       } else {
         score += pair.a.level.score;
       }
 
-      _scoreText.text = 'Score: $score';
+      scoreNotifier.value = score;
     }
   }
 
   void _checkGameOver(double dt) {
-    // #3: whereType を使わず _fruits を直接イテレート
     bool anyOverLine = false;
 
     for (final fruit in _fruits) {
       if (fruit.pendingMerge) continue;
+      if (!fruit.isMounted) continue;
       final pos = fruit.body.position;
       final vel = fruit.body.linearVelocity;
       if (pos.y < gameOverLineY && vel.length < 0.5) {
@@ -256,19 +221,15 @@ class WatermelonGame extends Forge2DGame with TapCallbacks, DragCallbacks {
     for (final f in _fruits) {
       f.removeFromParent();
     }
-    _fruits.clear(); // #3
+    _fruits.clear();
     _pendingMerges.clear();
     score = 0;
-    _scoreText.text = 'Score: 0';
+    scoreNotifier.value = 0;
     _gameOver = false;
     _gameOverTimer = 0;
     _dropCooldown = 0;
     _nextLevel = _randomLevel();
-    _nextFruitText.text = 'Next: ${_getFruitName(_nextLevel)}';
-    _nextFruitText.textRenderer = TextPaint(
-      style: TextStyle(color: _nextLevel.color, fontSize: 14),
-    );
-    _nextFruitPreview.updateLevel(_nextLevel);
+    nextLevelNotifier.value = _nextLevel;
     overlays.remove('GameOver');
   }
 }
