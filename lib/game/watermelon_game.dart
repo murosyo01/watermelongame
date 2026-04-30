@@ -5,7 +5,6 @@ import 'package:flame/events.dart';
 import 'package:flame/text.dart';
 import 'package:flame_forge2d/flame_forge2d.dart';
 import 'package:flutter/material.dart';
-import 'package:forge2d/forge2d.dart' as f2d;
 
 import '../components/drop_indicator.dart';
 import '../components/fruit.dart';
@@ -34,44 +33,51 @@ class WatermelonGame extends Forge2DGame with TapCallbacks {
   bool _gameOver = false;
   int score = 0;
 
+  // #3: Set<Fruit> でフルーツを管理して whereType を排除
+  final Set<Fruit> _fruits = {};
+
   late TextComponent _scoreText;
   late TextComponent _nextFruitText;
   late DropIndicator _dropIndicator;
 
   final _rng = Random();
 
+  // #7: onLoad を _setupCamera / _setupWorld / _setupUI に分割
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-
     world.physicsWorld.setContactListener(_contactListener);
+    _setupCamera();
+    await _setupWorld();
+    _setupUI();
+  }
 
+  void _setupCamera() {
     final gameWidth = containerRight - containerLeft;
     final gameHeight = containerBottom - containerTop;
-    final screenWidth = size.x;
-    final screenHeight = size.y;
-    
-    final zoomX = screenWidth / gameWidth;
-    final zoomY = screenHeight / gameHeight;
+    final zoomX = size.x / gameWidth;
+    final zoomY = size.y / gameHeight;
     camera.viewfinder.zoom = min(zoomX, zoomY) * 0.9;
     camera.viewfinder.position = Vector2(0, 0);
+  }
 
-    world.add(Walls(
+  Future<void> _setupWorld() async {
+    await world.add(Walls(
       leftX: containerLeft,
       rightX: containerRight,
       topY: containerTop,
       bottomY: containerBottom,
     ));
-
     _nextLevel = _randomLevel();
-
     _dropIndicator = DropIndicator(
       worldX: 0,
       topY: dropLineY,
       bottomY: containerBottom,
     );
-    world.add(_dropIndicator);
+    await world.add(_dropIndicator);
+  }
 
+  void _setupUI() {
     _scoreText = TextComponent(
       text: 'Score: 0',
       position: Vector2(4, 8),
@@ -120,6 +126,7 @@ class WatermelonGame extends Forge2DGame with TapCallbacks {
       spawnPosition: Vector2(clampedX, dropLineY),
     );
     world.add(fruit);
+    _fruits.add(fruit); // #3
 
     _dropIndicator.updateX(clampedX);
     _nextLevel = _randomLevel();
@@ -158,12 +165,16 @@ class WatermelonGame extends Forge2DGame with TapCallbacks {
 
       final nextLevel = pair.a.level.next;
 
+      // #3: Set から削除してから removeFromParent
+      _fruits.remove(pair.a);
+      _fruits.remove(pair.b);
       pair.a.removeFromParent();
       pair.b.removeFromParent();
 
       if (nextLevel != null) {
         final newFruit = Fruit(level: nextLevel, spawnPosition: midPoint.clone());
         world.add(newFruit);
+        _fruits.add(newFruit); // #3
         score += nextLevel.score;
       } else {
         score += pair.a.level.score;
@@ -174,10 +185,10 @@ class WatermelonGame extends Forge2DGame with TapCallbacks {
   }
 
   void _checkGameOver(double dt) {
-    final fruits = world.children.whereType<Fruit>();
+    // #3: whereType を使わず _fruits を直接イテレート
     bool anyOverLine = false;
 
-    for (final fruit in fruits) {
+    for (final fruit in _fruits) {
       if (fruit.pendingMerge) continue;
       final pos = fruit.body.position;
       final vel = fruit.body.linearVelocity;
@@ -199,10 +210,10 @@ class WatermelonGame extends Forge2DGame with TapCallbacks {
   }
 
   void restart() {
-    final fruits = world.children.whereType<Fruit>().toList();
-    for (final f in fruits) {
+    for (final f in _fruits) {
       f.removeFromParent();
     }
+    _fruits.clear(); // #3
     _pendingMerges.clear();
     score = 0;
     _scoreText.text = 'Score: 0';
@@ -210,6 +221,11 @@ class WatermelonGame extends Forge2DGame with TapCallbacks {
     _gameOverTimer = 0;
     _dropCooldown = 0;
     _nextLevel = _randomLevel();
+    // #1: restart 後に _nextFruitText を最新の _nextLevel で更新
+    _nextFruitText.text = 'Next: ${_getFruitName(_nextLevel)}';
+    _nextFruitText.textRenderer = TextPaint(
+      style: TextStyle(color: _nextLevel.color, fontSize: 14),
+    );
     overlays.remove('GameOver');
   }
 }
