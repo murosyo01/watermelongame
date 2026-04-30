@@ -13,8 +13,8 @@ class GameOverLine extends PositionComponent {
   final double rightX;
 
   final Paint _paint = Paint()
-    ..color = Colors.red
-    ..strokeWidth = 0.05
+    ..color = const Color(0x55E74C3C)
+    ..strokeWidth = 0.03
     ..style = PaintingStyle.stroke;
 
   static const double _dashLen = 0.15;
