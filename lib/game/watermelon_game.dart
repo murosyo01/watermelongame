@@ -34,6 +34,9 @@ class WatermelonGame extends Forge2DGame with TapCallbacks, DragCallbacks {
   bool _gameOver = false;
   int score = 0;
 
+  // #3: Set<Fruit> でフルーツを管理して whereType を排除
+  final Set<Fruit> _fruits = {};
+
   late TextComponent _scoreText;
   late TextComponent _nextFruitText;
   late DropIndicator _dropIndicator;
@@ -42,23 +45,27 @@ class WatermelonGame extends Forge2DGame with TapCallbacks, DragCallbacks {
   final _rng = Random();
   final Vector2 _dragCanvasPos = Vector2.zero();
 
+  // #7: onLoad を _setupCamera / _setupWorld / _setupUI に分割
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-
     world.physicsWorld.setContactListener(_contactListener);
+    _setupCamera();
+    await _setupWorld();
+    _setupUI();
+  }
 
+  void _setupCamera() {
     final gameWidth = containerRight - containerLeft;
     final gameHeight = containerBottom - containerTop;
-    final screenWidth = size.x;
-    final screenHeight = size.y;
-    
-    final zoomX = screenWidth / gameWidth;
-    final zoomY = screenHeight / gameHeight;
+    final zoomX = size.x / gameWidth;
+    final zoomY = size.y / gameHeight;
     camera.viewfinder.zoom = min(zoomX, zoomY) * 0.9;
     camera.viewfinder.position = Vector2(0, 0);
+  }
 
-    world.add(Walls(
+  Future<void> _setupWorld() async {
+    await world.add(Walls(
       leftX: containerLeft,
       rightX: containerRight,
       topY: containerTop,
@@ -70,16 +77,16 @@ class WatermelonGame extends Forge2DGame with TapCallbacks, DragCallbacks {
       leftX: containerLeft,
       rightX: containerRight,
     ));
-
     _nextLevel = _randomLevel();
-
     _dropIndicator = DropIndicator(
       worldX: 0,
       topY: dropLineY,
       bottomY: containerBottom,
     );
-    world.add(_dropIndicator);
+    await world.add(_dropIndicator);
+  }
 
+  void _setupUI() {
     _scoreText = TextComponent(
       text: 'Score: 0',
       position: Vector2(4, 8),
@@ -201,12 +208,16 @@ class WatermelonGame extends Forge2DGame with TapCallbacks, DragCallbacks {
 
       final nextLevel = pair.a.level.next;
 
+      // #3: Set から削除してから removeFromParent
+      _fruits.remove(pair.a);
+      _fruits.remove(pair.b);
       pair.a.removeFromParent();
       pair.b.removeFromParent();
 
       if (nextLevel != null) {
         final newFruit = Fruit(level: nextLevel, spawnPosition: midPoint.clone());
         world.add(newFruit);
+        _fruits.add(newFruit); // #3
         score += nextLevel.score;
       } else {
         score += pair.a.level.score;
@@ -217,10 +228,10 @@ class WatermelonGame extends Forge2DGame with TapCallbacks, DragCallbacks {
   }
 
   void _checkGameOver(double dt) {
-    final fruits = world.children.whereType<Fruit>();
+    // #3: whereType を使わず _fruits を直接イテレート
     bool anyOverLine = false;
 
-    for (final fruit in fruits) {
+    for (final fruit in _fruits) {
       if (fruit.pendingMerge) continue;
       final pos = fruit.body.position;
       final vel = fruit.body.linearVelocity;
@@ -242,10 +253,10 @@ class WatermelonGame extends Forge2DGame with TapCallbacks, DragCallbacks {
   }
 
   void restart() {
-    final fruits = world.children.whereType<Fruit>().toList();
-    for (final f in fruits) {
+    for (final f in _fruits) {
       f.removeFromParent();
     }
+    _fruits.clear(); // #3
     _pendingMerges.clear();
     score = 0;
     _scoreText.text = 'Score: 0';

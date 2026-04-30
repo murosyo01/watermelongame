@@ -16,12 +16,13 @@ class DropIndicator extends PositionComponent with HasGameRef {
     _worldX = worldX;
   }
 
+  final Paint _paint = Paint()
+    ..color = Colors.white38
+    ..strokeWidth = 0.1
+    ..style = PaintingStyle.stroke;
+
   @override
   void render(Canvas canvas) {
-    final paint = Paint()
-      ..color = Colors.white38
-      ..strokeWidth = 0.1
-      ..style = PaintingStyle.stroke;
-    canvas.drawLine(Offset(_worldX, topY), Offset(_worldX, bottomY), paint);
+    canvas.drawLine(Offset(_worldX, topY), Offset(_worldX, bottomY), _paint);
   }
 }
