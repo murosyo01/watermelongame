@@ -10,6 +10,8 @@ class DropIndicator extends PositionComponent with HasGameRef {
   final double topY;
   final double bottomY;
 
+  double get worldX => _worldX;
+
   void updateX(double worldX) {
     _worldX = worldX;
   }

@@ -5,15 +5,15 @@ import 'package:flame/events.dart';
 import 'package:flame/text.dart';
 import 'package:flame_forge2d/flame_forge2d.dart';
 import 'package:flutter/material.dart';
-import 'package:forge2d/forge2d.dart' as f2d;
-
 import '../components/drop_indicator.dart';
 import '../components/fruit.dart';
+import '../components/game_over_line.dart';
+import '../components/next_fruit_preview.dart';
 import '../components/walls.dart';
 import '../models/fruit_level.dart';
 import '../systems/merge_contact_listener.dart';
 
-class WatermelonGame extends Forge2DGame with TapCallbacks {
+class WatermelonGame extends Forge2DGame with TapCallbacks, DragCallbacks {
   late final MergeContactListener _contactListener;
 
   WatermelonGame() : super(gravity: Vector2(0, 30)) {
@@ -37,8 +37,10 @@ class WatermelonGame extends Forge2DGame with TapCallbacks {
   late TextComponent _scoreText;
   late TextComponent _nextFruitText;
   late DropIndicator _dropIndicator;
+  late NextFruitPreview _nextFruitPreview;
 
   final _rng = Random();
+  final Vector2 _dragCanvasPos = Vector2.zero();
 
   @override
   Future<void> onLoad() async {
@@ -61,6 +63,12 @@ class WatermelonGame extends Forge2DGame with TapCallbacks {
       rightX: containerRight,
       topY: containerTop,
       bottomY: containerBottom,
+    ));
+
+    world.add(GameOverLine(
+      lineY: gameOverLineY,
+      leftX: containerLeft,
+      rightX: containerRight,
     ));
 
     _nextLevel = _randomLevel();
@@ -89,6 +97,12 @@ class WatermelonGame extends Forge2DGame with TapCallbacks {
       ),
     );
     camera.viewport.add(_nextFruitText);
+
+    _nextFruitPreview = NextFruitPreview(
+      level: _nextLevel,
+      center: Vector2(size.x - 40, 40),
+    );
+    camera.viewport.add(_nextFruitPreview);
   }
 
   String _getFruitName(FruitLevel level) {
@@ -104,29 +118,58 @@ class WatermelonGame extends Forge2DGame with TapCallbacks {
     return spawnLevels[_rng.nextInt(spawnLevels.length)];
   }
 
-  @override
-  void onTapDown(TapDownEvent event) {
-    if (_gameOver) return;
-    if (_dropCooldown > 0) return;
-
-    final worldPos = screenToWorld(event.canvasPosition);
+  void _dropFruit(Vector2 canvasPosition) {
+    final worldPos = screenToWorld(canvasPosition);
     final clampedX = worldPos.x.clamp(
       containerLeft + _nextLevel.radius + 0.05,
       containerRight - _nextLevel.radius - 0.05,
     );
-
-    final fruit = Fruit(
-      level: _nextLevel,
-      spawnPosition: Vector2(clampedX, dropLineY),
-    );
-    world.add(fruit);
-
+    world.add(Fruit(level: _nextLevel, spawnPosition: Vector2(clampedX, dropLineY)));
     _dropIndicator.updateX(clampedX);
     _nextLevel = _randomLevel();
     _nextFruitText.text = 'Next: ${_getFruitName(_nextLevel)}';
     _nextFruitText.textRenderer = TextPaint(
       style: TextStyle(color: _nextLevel.color, fontSize: 14),
     );
+    _nextFruitPreview.updateLevel(_nextLevel);
+    _dropCooldown = 0.5;
+  }
+
+  @override
+  void onTapDown(TapDownEvent event) {
+    if (_gameOver || _dropCooldown > 0) return;
+    _dropFruit(event.canvasPosition);
+  }
+
+  @override
+  void onDragStart(DragStartEvent event) {
+    super.onDragStart(event);
+    _dragCanvasPos.setFrom(event.canvasPosition);
+  }
+
+  @override
+  void onDragUpdate(DragUpdateEvent event) {
+    _dragCanvasPos.add(event.localDelta);
+    if (_gameOver || _dropCooldown > 0) return;
+    final worldPos = screenToWorld(_dragCanvasPos);
+    final clampedX = worldPos.x.clamp(
+      containerLeft + _nextLevel.radius + 0.05,
+      containerRight - _nextLevel.radius - 0.05,
+    );
+    _dropIndicator.updateX(clampedX);
+  }
+
+  @override
+  void onDragEnd(DragEndEvent event) {
+    super.onDragEnd(event);
+    if (_gameOver || _dropCooldown > 0) return;
+    world.add(Fruit(level: _nextLevel, spawnPosition: Vector2(_dropIndicator.worldX, dropLineY)));
+    _nextLevel = _randomLevel();
+    _nextFruitText.text = 'Next: ${_getFruitName(_nextLevel)}';
+    _nextFruitText.textRenderer = TextPaint(
+      style: TextStyle(color: _nextLevel.color, fontSize: 14),
+    );
+    _nextFruitPreview.updateLevel(_nextLevel);
     _dropCooldown = 0.5;
   }
 
@@ -210,6 +253,11 @@ class WatermelonGame extends Forge2DGame with TapCallbacks {
     _gameOverTimer = 0;
     _dropCooldown = 0;
     _nextLevel = _randomLevel();
+    _nextFruitText.text = 'Next: ${_getFruitName(_nextLevel)}';
+    _nextFruitText.textRenderer = TextPaint(
+      style: TextStyle(color: _nextLevel.color, fontSize: 14),
+    );
+    _nextFruitPreview.updateLevel(_nextLevel);
     overlays.remove('GameOver');
   }
 }
