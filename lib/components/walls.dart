@@ -2,7 +2,7 @@ import 'package:flame/components.dart';
 import 'package:flame_forge2d/flame_forge2d.dart';
 import 'package:flutter/material.dart';
 
-class Walls extends Component with HasGameRef {
+class Walls extends Component {
   Walls({
     required this.leftX,
     required this.rightX,
@@ -18,23 +18,33 @@ class Walls extends Component with HasGameRef {
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    final forge2dGame = gameRef as Forge2DGame;
-
-    _addEdge(forge2dGame, Vector2(leftX, topY), Vector2(leftX, bottomY));
-    _addEdge(forge2dGame, Vector2(rightX, topY), Vector2(rightX, bottomY));
-    _addEdge(forge2dGame, Vector2(leftX, bottomY), Vector2(rightX, bottomY));
-
-    add(WallLine(from: Vector2(leftX, topY), to: Vector2(leftX, bottomY)));
-    add(WallLine(from: Vector2(rightX, topY), to: Vector2(rightX, bottomY)));
-    add(WallLine(from: Vector2(leftX, bottomY), to: Vector2(rightX, bottomY)));
+    addAll([
+      WallEdge(from: Vector2(leftX, topY), to: Vector2(leftX, bottomY)),
+      WallEdge(from: Vector2(rightX, topY), to: Vector2(rightX, bottomY)),
+      WallEdge(from: Vector2(leftX, bottomY), to: Vector2(rightX, bottomY)),
+      WallLine(from: Vector2(leftX, topY), to: Vector2(leftX, bottomY)),
+      WallLine(from: Vector2(rightX, topY), to: Vector2(rightX, bottomY)),
+      WallLine(from: Vector2(leftX, bottomY), to: Vector2(rightX, bottomY)),
+    ]);
   }
+}
 
-  void _addEdge(Forge2DGame game, Vector2 from, Vector2 to) {
-    final bodyDef = BodyDef(type: BodyType.static);
-    final body = game.world.createBody(bodyDef);
+class WallEdge extends BodyComponent {
+  WallEdge({required this.from, required this.to});
+
+  final Vector2 from;
+  final Vector2 to;
+
+  @override
+  Body createBody() {
+    final body = world.createBody(BodyDef(type: BodyType.static));
     final shape = EdgeShape()..set(from, to);
     body.createFixture(FixtureDef(shape, friction: 0.3));
+    return body;
   }
+
+  @override
+  void render(Canvas canvas) {}
 }
 
 class WallLine extends PositionComponent {
@@ -43,12 +53,13 @@ class WallLine extends PositionComponent {
   final Vector2 from;
   final Vector2 to;
 
+  final Paint _paint = Paint()
+    ..color = Colors.white
+    ..strokeWidth = 0.1
+    ..style = PaintingStyle.stroke;
+
   @override
   void render(Canvas canvas) {
-    final paint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 0.1
-      ..style = PaintingStyle.stroke;
-    canvas.drawLine(from.toOffset(), to.toOffset(), paint);
+    canvas.drawLine(from.toOffset(), to.toOffset(), _paint);
   }
 }
