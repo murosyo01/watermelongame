@@ -31,15 +31,15 @@ class Fruit extends BodyComponent {
     return body;
   }
 
+  late final Paint _fillPaint = Paint()..color = level.color;
+  late final Paint _borderPaint = Paint()
+    ..color = Colors.black26
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 0.05;
+
   @override
   void render(Canvas canvas) {
-    final paint = Paint()..color = level.color;
-    canvas.drawCircle(Offset.zero, level.radius, paint);
-
-    final borderPaint = Paint()
-      ..color = Colors.black26
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.05;
-    canvas.drawCircle(Offset.zero, level.radius, borderPaint);
+    canvas.drawCircle(Offset.zero, level.radius, _fillPaint);
+    canvas.drawCircle(Offset.zero, level.radius, _borderPaint);
   }
 }
