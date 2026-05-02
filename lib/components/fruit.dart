@@ -9,6 +9,14 @@ class Fruit extends BodyComponent {
   final FruitLevel level;
   final Vector2 _spawnPosition;
   bool pendingMerge = false;
+  bool hasEnteredField = false;
+  double timeSinceSpawn = 0.0;
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    timeSinceSpawn += dt;
+  }
 
   @override
   Body createBody() {

@@ -47,3 +47,8 @@ app.*.map.json
 # Claude related
 .claude/work/
 .claude/worktrees/
+
+.playwright/
+.playwright-mcp/
+/game-screenshot*.png
+/game-loaded*.png

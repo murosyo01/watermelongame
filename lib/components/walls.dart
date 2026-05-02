@@ -22,9 +22,6 @@ class Walls extends Component {
       WallEdge(from: Vector2(leftX, topY), to: Vector2(leftX, bottomY)),
       WallEdge(from: Vector2(rightX, topY), to: Vector2(rightX, bottomY)),
       WallEdge(from: Vector2(leftX, bottomY), to: Vector2(rightX, bottomY)),
-      WallLine(from: Vector2(leftX, topY), to: Vector2(leftX, bottomY)),
-      WallLine(from: Vector2(rightX, topY), to: Vector2(rightX, bottomY)),
-      WallLine(from: Vector2(leftX, bottomY), to: Vector2(rightX, bottomY)),
     ]);
   }
 }
@@ -45,21 +42,4 @@ class WallEdge extends BodyComponent {
 
   @override
   void render(Canvas canvas) {}
-}
-
-class WallLine extends PositionComponent {
-  WallLine({required this.from, required this.to});
-
-  final Vector2 from;
-  final Vector2 to;
-
-  final Paint _paint = Paint()
-    ..color = Colors.white
-    ..strokeWidth = 0.1
-    ..style = PaintingStyle.stroke;
-
-  @override
-  void render(Canvas canvas) {
-    canvas.drawLine(from.toOffset(), to.toOffset(), _paint);
-  }
 }
